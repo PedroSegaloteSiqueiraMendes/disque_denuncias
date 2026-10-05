@@ -3,7 +3,9 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { currentSession } from "@/lib/session";
 
-const threshold = 5;
+// Dashboard visibility follows the authenticated tenant scope. Users who can
+// access the client portal may see all aggregate counts for their company.
+const threshold = 1;
 export async function GET(request: Request) {
   const session = await currentSession();
   if (!session) return NextResponse.json({ error: "Autenticação necessária." }, { status: 401 });
