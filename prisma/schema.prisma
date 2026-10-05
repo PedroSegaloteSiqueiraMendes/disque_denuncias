@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  CLIENT_ADMIN
+  ANALYST
+  VIEWER
+}
+enum ComplaintStatus {
+  RECEIVED
+  TRIAGE
+  ANALYSIS
+  INVESTIGATION
+  DECISION_WAITING
+  CLOSED
+}
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+enum Result {
+  SUBSTANTIATED
+  PARTIALLY_SUBSTANTIATED
+  UNSUBSTANTIATED
+  INCONCLUSIVE
+  UNDEFINED
+}
+enum OccurredPeriod {
+  TODAY
+  LAST_7_DAYS
+  LAST_30_DAYS
+  OVER_30_DAYS
+  UNKNOWN
+}
+
+model Company {
+  id String @id @default(cuid())
+  name String
+  legalName String?
+  cnpj String? @unique
+  slug String @unique
+  logoData String? @db.Text
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  users User[]
+  units Unit[]
+  departments Department[]
+  categories ComplaintCategory[]
+  complaints Complaint[]
+}
+
+model User {
+  id String @id @default(cuid())
+  companyId String?
+  company Company? @relation(fields: [companyId], references: [id])
+  name String
+  email String @unique
+  passwordHash String
+  role Role @default(ANALYST)
+  mustChangePassword Boolean @default(false)
+  active Boolean @default(true)
+  assignedComplaints ComplaintAnalysis[] @relation("AssignedUser")
+  histories ComplaintHistory[]
+  auditLogs AuditLog[]
+  roleAssignments UserRole[]
+  notifications ComplaintNotification[]
+  createdAt DateTime @default(now())
+}
+
+model Permission {
+  id String @id @default(cuid())
+  key String @unique
+  description String
+  roleGrants RolePermission[]
+}
+
+model RolePermission {
+  role Role
+  permissionId String
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  @@id([role, permissionId])
+}
+
+model UserRole {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role
+  @@id([userId, role])
+}
+
+model Unit {
+  id String @id @default(cuid())
+  companyId String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name String
+  active Boolean @default(true)
+  complaints Complaint[]
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Department {
+  id String @id @default(cuid())
+  companyId String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name String
+  active Boolean @default(true)
+  complaints Complaint[]
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model ComplaintCategory {
+  id String @id @default(cuid())
+  companyId String?
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name String
+  description String?
+  icon String?
+  active Boolean @default(true)
+  complaints Complaint[]
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Complaint {
+  id String @id @default(cuid())
+  publicInternalCode String @unique
+  companyId String
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId String
+  category ComplaintCategory @relation(fields: [categoryId], references: [id])
+  unitId String?
+  unit Unit? @relation(fields: [unitId], references: [id])
+  departmentId String?
+  department Department? @relation(fields: [departmentId], references: [id])
+  occurredPeriod OccurredPeriod
+  isRecurring Boolean?
+  isStillOccurring Boolean?
+  description String @db.Text
+  createdAt DateTime @default(now())
+  attachments ComplaintAttachment[]
+  analysis ComplaintAnalysis?
+  history ComplaintHistory[]
+  notifications ComplaintNotification[]
+  @@index([companyId, createdAt])
+  @@index([companyId, categoryId, createdAt])
+}
+
+model ComplaintNotification {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complaintId String
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([userId, complaintId])
+  @@index([userId, readAt, createdAt])
+}
+
+model ComplaintAttachment {
+  id String @id @default(cuid())
+  complaintId String
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  storageKey String @unique
+  originalName String
+  mimeType String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+}
+
+model ComplaintAnalysis {
+  id String @id @default(cuid())
+  complaintId String @unique
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  status ComplaintStatus @default(RECEIVED)
+  severity Severity?
+  result Result @default(UNDEFINED)
+  assignedUserId String?
+  assignedUser User? @relation("AssignedUser", fields: [assignedUserId], references: [id])
+  internalNotes String? @db.Text
+  actionsTaken String? @db.Text
+  closedAt DateTime?
+  updatedAt DateTime @updatedAt
+}
+
+model ComplaintHistory {
+  id String @id @default(cuid())
+  complaintId String
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  userId String?
+  user User? @relation(fields: [userId], references: [id])
+  action String
+  previousValue String? @db.Text
+  newValue String? @db.Text
+  createdAt DateTime @default(now())
+  @@index([complaintId, createdAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  userId String?
+  user User? @relation(fields: [userId], references: [id])
+  companyId String?
+  action String
+  entityType String
+  entityId String?
+  createdAt DateTime @default(now())
+  @@index([companyId, createdAt])
+}
+
+model ComplaintSequence {
+  year Int @id
+  value Int @default(0)
+}

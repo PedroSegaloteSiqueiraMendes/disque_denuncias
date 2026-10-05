@@ -1,0 +1,10 @@
+node_modules/
+.next/
+Layout/
+private-uploads/
+dist/
+*.log
+.env
+.env.*
+!.env.example
+*.local
