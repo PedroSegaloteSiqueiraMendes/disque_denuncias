@@ -7,3 +7,4 @@ dist/
 private-uploads/
 
 *.local
+tsconfig.tsbuildinfo
